@@ -40,7 +40,9 @@ dependencies:
   path_provider: ^2.0.14
   permission_handler: ^10.2.0
   gallery_saver: ^2.3.2
+  device_information: ^0.0.4
   device_imei: ^0.0.4+1
+  flutter_device_identifier: ^0.0.1
   
 
 dev_dependencies:
