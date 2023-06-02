@@ -1,8 +1,8 @@
-import 'package:camerawesome/pigeon.dart';
+
 import 'package:flutter/material.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'dart:io';
-import 'package:camerawesome/camerawesome_plugin.dart';
+
 import 'package:better_open_file/better_open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -10,7 +10,7 @@ import 'package:gallery_saver/gallery_saver.dart';
 import 'dart:typed_data';
 import 'package:device_information/device_information.dart';
 import 'package:flutter_device_identifier/flutter_device_identifier.dart';
-import '';
+import 'encrypt.dart';
 
 void main() {
   runApp(const CameraAwesomeApp());
@@ -37,26 +37,29 @@ class CameraPage extends StatelessWidget {
       var str = '';
       var permission = await Permission.phone.status;
       String imei = '';
+      List<int> bytes = [];
       PermissionStatus status = await Permission.phone.request();
       try {
         await FlutterDeviceIdentifier.requestPermission();
         imei = await FlutterDeviceIdentifier.imeiCode;
-        print(imei);
-        str ='imei no :'+ imei;
-        var snack = new SnackBar(content: Text(str));
+        str = 'imei no :' + imei;
+        var snack = SnackBar(content: Text(str));
         ScaffoldMessenger.of(context).showSnackBar(snack);
       } catch (e) {
         str = 'couldn\'t fetch imei';
-        var snack = new SnackBar(content: Text(str));
+        var snack = SnackBar(content: Text(str));
         ScaffoldMessenger.of(context).showSnackBar(snack);
       }
       var result;
-      if (media.isPicture)
+      if (media.isPicture) {
         result = await GallerySaver.saveImage(
             albumName: 'tracex', media.filePath, toDcim: true);
-      else
+      } else {
+        MediaCapture encodedmedia =await  encodeMessage(videoPath: media.filePath, message: imei);
+        
         result = await GallerySaver.saveVideo(
-            albumName: 'tracex', media.filePath, toDcim: true);
+            albumName: 'tracex', encodedmedia.filePath, toDcim: true);
+      }
 
       if (result!) {
         print('success');
