@@ -2,74 +2,139 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
+import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
+import 'dart:typed_data';
+import 'package:image/image.dart' as img;
 
-Future<MediaCapture> encodeMessage({required videoPath, required message}) async {
-  // Read video frames
-
-
-  // Read video frames
-  List<int> videoBytes = File(videoPath).readAsBytesSync();
-
-  // Encode the message in video frames
-  List<int> encodedBytes = encodetoVdo(videoBytes, message);
-
-  // Save the encoded video frames to a temporary file
-  String tempPath = await saveEncodedVideo(encodedBytes);
-
-  // Create a MediaCapture object from the temporary file
-  MediaCapture encodedMediaCapture = MediaCapture.capturing(filePath: tempPath);
-
-  // Output the encoded MediaCapture
-  return encodedMediaCapture;
+String darrEncrypt(String text, String key) {
+  String encryptedText = '';
+  int keyLength = key.length;
+  for (int i = 0; i < text.length; i++) {
+    int keyIndex = i % keyLength;
+    int keyChar = key.codeUnitAt(keyIndex);
+    int encryptedChar = (text.codeUnitAt(i) + keyChar) % 256;
+    encryptedText += String.fromCharCode(encryptedChar);
+  }
+  print(encryptedText);
+  darrDecrypt(encryptedText, key);
+  return encryptedText;
 }
 
-List<int> encodeIntInBytes(int value) {
-  List<int> bytes = [];
-
-  // Encode the integer value in 4 bytes
-  bytes.add((value >> 24) & 0xFF);
-  bytes.add((value >> 16) & 0xFF);
-  bytes.add((value >> 8) & 0xFF);
-  bytes.add(value & 0xFF);
-
-  return bytes;
+String darrDecrypt(String encryptedText, String key) {
+  String decryptedText = '';
+  int keyLength = key.length;
+  for (int i = 0; i < encryptedText.length; i++) {
+    int keyIndex = i % keyLength;
+    int keyChar = key.codeUnitAt(keyIndex);
+    int decryptedChar = (encryptedText.codeUnitAt(i) - keyChar) % 256;
+    decryptedText += String.fromCharCode(decryptedChar);
+  }
+  print(decryptedText);
+  return decryptedText;
 }
 
-List<int> encodetoVdo(List<int> videoBytes, String message) {
-  List<int> encodedBytes = [];
+List<int> stringToBinary(String message) {
+  List<int> binaryMessage = [];
 
-  // Convert the message to bytes
-  List<int> messageBytes = utf8.encode(message);
+  for (int i = 0; i < message.length; i++) {
+    int charCode = message.codeUnitAt(i);
+    String binary = charCode.toRadixString(2).padLeft(8, '0');
 
-  int messageLength = messageBytes.length;
-
-  // XOR encryption key
-  int key = 42;
-
-  // Encode the message length in the first 4 bytes of the video frames
-  encodedBytes.addAll(encodeIntInBytes(messageLength));
-
-  // XOR encrypt and encode the message bytes in the video frames
-  for (int i = 0; i < videoBytes.length; i++) {
-    int videoByte = videoBytes[i];
-
-    if (i < messageBytes.length) {
-      // XOR encrypt the message byte with the key
-      int encryptedByte = messageBytes[i] ^ key;
-      encodedBytes.add(encryptedByte);
-    } else {
-      // Copy the remaining video bytes as is
-      encodedBytes.add(videoByte);
+    for (int j = 0; j < binary.length; j++) {
+      binaryMessage.add(int.parse(binary[j]));
     }
   }
-  return encodedBytes;
+
+  return binaryMessage;
 }
 
-Future<String> saveEncodedVideo(List<int> encodedBytes) async {
-  // Save the encoded video frames to a temporary file
-  Directory tempDir = await Directory.systemTemp.createTemp();
-  String tempPath = '${tempDir.path}/encoded_video.mp4';
-  File encodedVideoFile = File(tempPath);
-  await encodedVideoFile.writeAsBytes(encodedBytes);
-  return tempPath;
+Uint8List embedMessage(Uint8List videoBytes, List<int> binaryMessage) {
+  int messageIndex = 0;
+
+  for (int i = 0; i < videoBytes.length; i++) {
+    if (messageIndex >= binaryMessage.length) {
+      break; // All message bits have been embedded
+    }
+
+    int videoByte = videoBytes[i];
+    int messageBit = binaryMessage[messageIndex];
+
+    // Embed the message bit in the least significant bit of the video byte
+    int stegoByte = (videoByte & 0xFE) | messageBit;
+    videoBytes[i] = stegoByte;
+
+    messageIndex++;
+  }
+
+  return videoBytes;
+}
+
+Uint8List performSteganography(Uint8List imageData, String message) {
+  // Perform your steganography algorithm here
+  // This is just a placeholder demonstrating simple LSB (Least Significant Bit) steganography
+
+  final messageBytes = Uint8List.fromList(message.codeUnits);
+  final imageLength = imageData.length;
+  final messageLength = messageBytes.length;
+
+  if (messageLength > imageLength) {
+    throw Exception('Message size exceeds image capacity');
+  }
+
+  for (var i = 0; i < messageLength; i++) {
+    final imageByte = imageData[i];
+    final messageByte = messageBytes[i];
+
+    // Perform LSB steganography by replacing the least significant bit of the image byte with the message byte
+    final stegoByte = (imageByte & 0xFE) | (messageByte >> 7 & 0x01);
+    imageData[i] = stegoByte;
+  }
+
+  return imageData;
+}
+
+Future<String> encodeMessage(
+    {required MediaCapture media, required msg}) async {
+  // Define the input and output file paths
+  final videoFilePath =
+      media.filePath; // Replace with your video file path
+  final outputVideoFilePath =
+      media.filePath; // Replace with the desired output video file path
+  final message =
+      msg; // Replace with the message you want to hide
+
+  // Read the video file
+  final videoBytes = File(videoFilePath).readAsBytesSync();
+   final flutterFFmpeg = FlutterFFmpeg();
+  final Directory? extDir = await getExternalStorageDirectory();
+                  final testDir = await Directory('${extDir?.path}/img/${DateTime.now().millisecondsSinceEpoch}')
+                      .create(recursive: true);
+  // Create the output directory if it doesn't exist
+
+
+  // Split the video into frames using ffmpeg
+  await flutterFFmpeg.execute('-i $videoFilePath ${testDir.path}/frame-%04d.jpg');
+
+  // Get the list of frame files in the output directory
+  final frameFiles = Directory(testDir.path)
+      .listSync()
+      .where((entity) => entity is File && entity.path.endsWith('.jpg'))
+      .map((entity) => entity.path)
+      .toList();
+
+  // Iterate through each frame and perform steganography
+  for (final frameFile in frameFiles) {
+    final frameBytes = File(frameFile).readAsBytesSync();
+
+    // Perform image steganography on the frame bytes
+    final steganographyBytes = performSteganography(frameBytes, message);
+
+    // Save the modified frame back to the file
+    File(frameFile).writeAsBytesSync(steganographyBytes);
+  }
+  
+
+  // Save the modified video to a file
+
+  return outputVideoFilePath;
 }

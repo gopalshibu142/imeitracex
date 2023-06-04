@@ -43,6 +43,9 @@ dependencies:
   device_information: ^0.0.4
   device_imei: ^0.0.4+1
   flutter_device_identifier: ^0.0.1
+  flutter_ffmpeg: ^0.4.2
+  image: ^4.0.17
+
   
 
 dev_dependencies:
