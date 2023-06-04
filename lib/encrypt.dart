@@ -96,24 +96,23 @@ Uint8List performSteganography(Uint8List imageData, String message) {
 Future<String> encodeMessage(
     {required MediaCapture media, required msg}) async {
   // Define the input and output file paths
-  final videoFilePath =
-      media.filePath; // Replace with your video file path
+  final videoFilePath = media.filePath; // Replace with your video file path
   final outputVideoFilePath =
       media.filePath; // Replace with the desired output video file path
-  final message =
-      msg; // Replace with the message you want to hide
+  final message = msg; // Replace with the message you want to hide
 
   // Read the video file
   final videoBytes = File(videoFilePath).readAsBytesSync();
-   final flutterFFmpeg = FlutterFFmpeg();
+  final flutterFFmpeg = FlutterFFmpeg();
   final Directory? extDir = await getExternalStorageDirectory();
-                  final testDir = await Directory('${extDir?.path}/img/${DateTime.now().millisecondsSinceEpoch}')
-                      .create(recursive: true);
+  final testDir = await Directory(
+          '${extDir?.path}/img/${DateTime.now().millisecondsSinceEpoch}')
+      .create(recursive: true);
   // Create the output directory if it doesn't exist
 
-
   // Split the video into frames using ffmpeg
-  await flutterFFmpeg.execute('-i $videoFilePath ${testDir.path}/frame-%04d.jpg');
+  await flutterFFmpeg
+      .execute('-i $videoFilePath ${testDir.path}/frame-%04d.jpg');
 
   // Get the list of frame files in the output directory
   final frameFiles = Directory(testDir.path)
@@ -122,19 +121,43 @@ Future<String> encodeMessage(
       .map((entity) => entity.path)
       .toList();
 
-  // Iterate through each frame and perform steganography
+  List<File> files = [];
   for (final frameFile in frameFiles) {
     final frameBytes = File(frameFile).readAsBytesSync();
-
+    files.add(File(frameFile));
     // Perform image steganography on the frame bytes
     final steganographyBytes = performSteganography(frameBytes, message);
 
     // Save the modified frame back to the file
     File(frameFile).writeAsBytesSync(steganographyBytes);
+    encodeFramesToVideo(files, media.filePath);
   }
-  
 
   // Save the modified video to a file
 
   return outputVideoFilePath;
+}
+
+Future<void> encodeFramesToVideo(
+    List<File> frames, String outputVideoPath) async {
+  final flutterFFmpeg = FlutterFFmpeg();
+
+  // Create a temporary directory to store the encoded frames
+  final tempDirectory = Directory.systemTemp.createTempSync();
+
+  try {
+    // Copy the frames to the temporary directory
+    for (int i = 0; i < frames.length; i++) {
+      final frame = frames[i];
+      final framePath = '${tempDirectory.path}/frame-$i.jpg';
+      await frame.copy(framePath);
+    }
+
+    // Encode the frames into a video using FFmpeg
+    await flutterFFmpeg.execute(
+        '-framerate 30 -i ${tempDirectory.path}/frame-%d.jpg -c:v libx264 -preset veryfast -crf 18 $outputVideoPath');
+  } finally {
+    // Delete the temporary directory and its contents
+    tempDirectory.deleteSync(recursive: true);
+  }
 }

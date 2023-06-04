@@ -45,6 +45,7 @@ dependencies:
   flutter_device_identifier: ^0.0.1
   flutter_ffmpeg: ^0.4.2
   image: ^4.0.17
+  flutter_launcher_icons: ^0.13.1
 
   
 
